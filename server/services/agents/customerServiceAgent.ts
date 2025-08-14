@@ -1,6 +1,6 @@
 // Customer Service Agent - Specialized for user support and assistance
-import { openaiService } from '../openai';
-import { pineconeService } from '../pinecone';
+import { openaiService } from '../openai/openaiService';
+import { pineconeService } from '../rag/pineconeService';
 import { storage } from '../../storage';
 
 export interface SupportRequest {

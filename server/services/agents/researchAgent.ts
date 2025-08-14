@@ -1,6 +1,6 @@
 // Research Agent - Specialized for destination research and travel data gathering
-import { openaiService } from '../openai';
-import { pineconeService } from '../pinecone';
+import { openaiService } from '../openai/openaiService';
+import { pineconeService } from '../rag/pineconeService';
 import { storage } from '../../storage';
 
 export interface ResearchQuery {

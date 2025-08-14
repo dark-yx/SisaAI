@@ -1,6 +1,6 @@
 // Planner Agent - Specialized for creating detailed travel itineraries
-import { openaiService } from '../openai';
-import { pineconeService } from '../pinecone';
+import { openaiService } from '../openai/openaiService';
+import { pineconeService } from '../rag/pineconeService';
 import { storage } from '../../storage';
 
 export interface PlanningRequest {

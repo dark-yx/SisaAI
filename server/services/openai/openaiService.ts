@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key" 
+  apiKey: process.env.OPENAI_API_KEY || "default_key" 
 });
 
 export interface ResearchResult {
@@ -35,7 +34,7 @@ export interface ItineraryResult {
 
 export interface RecommendationResult {
   recommendations: Array<{
-    type: string; // hotel, restaurant, activity, attraction
+    type: string;
     name: string;
     description: string;
     rating: number;
@@ -49,27 +48,27 @@ export interface RecommendationResult {
 export class OpenAIService {
   async searchDestinations(query: string, budget?: string, duration?: number): Promise<ResearchResult> {
     try {
-      const prompt = `As a travel research expert, find and analyze destinations based on this query: "${query}". 
-      ${budget ? `Budget: ${budget}` : ''} 
-      ${duration ? `Duration: ${duration} days` : ''}
+      const prompt = `Como experto en investigación de viajes, encuentra y analiza destinos basándote en esta consulta: "${query}". 
+      ${budget ? `Presupuesto: ${budget}` : ''} 
+      ${duration ? `Duración: ${duration} días` : ''}
       
-      Provide detailed, accurate information about 3-4 destinations that match the criteria. 
-      Include specific details about costs, best times to visit, and unique highlights.
+      Proporciona información detallada y precisa sobre 3-4 destinos que coincidan con los criterios. 
+      Incluye detalles específicos sobre costos, mejores épocas para visitar y aspectos únicos destacados.
       
-      Respond with JSON in this format: 
+      Responde con JSON en este formato: 
       {
         "destinations": [
           {
-            "name": "Destination Name",
-            "description": "Brief description",
-            "highlights": ["highlight1", "highlight2"],
-            "bestTime": "Best time to visit",
-            "estimatedCost": "Cost estimate",
-            "imageUrl": "https://example.com/image.jpg"
+            "name": "Nombre del Destino",
+            "description": "Descripción breve",
+            "highlights": ["destacado1", "destacado2"],
+            "bestTime": "Mejor época para visitar",
+            "estimatedCost": "Estimación de costo",
+            "imageUrl": "https://images.pexels.com/photos/1285625/pexels-photo-1285625.jpeg"
           }
         ],
         "insights": ["insight1", "insight2"],
-        "sources": ["source1", "source2"]
+        "sources": ["fuente1", "fuente2"]
       }`;
 
       const response = await openai.chat.completions.create({
@@ -77,7 +76,7 @@ export class OpenAIService {
         messages: [
           {
             role: "system",
-            content: "You are a professional travel research agent with access to current travel data. Provide accurate, helpful destination information."
+            content: "Eres un agente profesional de investigación de viajes con acceso a datos actuales de viaje. Proporciona información precisa y útil sobre destinos en español."
           },
           {
             role: "user",
@@ -85,6 +84,7 @@ export class OpenAIService {
           }
         ],
         response_format: { type: "json_object" },
+        temperature: 0.7,
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
@@ -101,14 +101,14 @@ export class OpenAIService {
     interests: string[]
   ): Promise<ItineraryResult> {
     try {
-      const prompt = `As a travel planning expert, create a detailed ${duration}-day itinerary for ${destination}.
-      Budget: ${budget}
-      Interests: ${interests.join(", ")}
+      const prompt = `Como experto en planificación de viajes, crea un itinerario detallado de ${duration} días para ${destination}.
+      Presupuesto: ${budget}
+      Intereses: ${interests.join(", ")}
       
-      Create a comprehensive day-by-day itinerary with specific activities, timings, locations, and costs.
-      Include practical tips and local insights.
+      Crea un itinerario completo día a día con actividades específicas, horarios, ubicaciones y costos.
+      Incluye consejos prácticos e insights locales.
       
-      Respond with JSON in this format:
+      Responde con JSON en este formato:
       {
         "itinerary": [
           {
@@ -116,16 +116,16 @@ export class OpenAIService {
             "activities": [
               {
                 "time": "9:00 AM",
-                "activity": "Activity name",
-                "location": "Specific location",
+                "activity": "Nombre de la actividad",
+                "location": "Ubicación específica",
                 "cost": "$XX",
-                "description": "Brief description"
+                "description": "Descripción breve"
               }
             ]
           }
         ],
         "totalCost": "$XXX",
-        "tips": ["tip1", "tip2"]
+        "tips": ["consejo1", "consejo2"]
       }`;
 
       const response = await openai.chat.completions.create({
@@ -133,7 +133,7 @@ export class OpenAIService {
         messages: [
           {
             role: "system",
-            content: "You are a professional travel planning agent specializing in creating detailed, practical itineraries."
+            content: "Eres un agente profesional de planificación de viajes especializado en crear itinerarios detallados y prácticos en español."
           },
           {
             role: "user",
@@ -141,6 +141,7 @@ export class OpenAIService {
           }
         ],
         response_format: { type: "json_object" },
+        temperature: 0.7,
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
@@ -160,28 +161,28 @@ export class OpenAIService {
     }
   ): Promise<RecommendationResult> {
     try {
-      const prompt = `As a travel recommendation expert, provide personalized recommendations for ${destination}.
+      const prompt = `Como experto en recomendaciones de viaje, proporciona recomendaciones personalizadas para ${destination}.
       
-      User Profile:
-      - Travel Style: ${userPreferences.travelStyle}
-      - Budget: ${userPreferences.budget}
-      - Interests: ${userPreferences.interests.join(", ")}
-      - Previous Trips: ${userPreferences.previousTrips.join(", ")}
+      Perfil del Usuario:
+      - Estilo de Viaje: ${userPreferences.travelStyle}
+      - Presupuesto: ${userPreferences.budget}
+      - Intereses: ${userPreferences.interests.join(", ")}
+      - Viajes Anteriores: ${userPreferences.previousTrips.join(", ")}
       
-      Provide personalized recommendations for hotels, restaurants, activities, and attractions.
-      Explain why each recommendation fits the user's profile.
+      Proporciona recomendaciones personalizadas para hoteles, restaurantes, actividades y atracciones.
+      Explica por qué cada recomendación se ajusta al perfil del usuario.
       
-      Respond with JSON in this format:
+      Responde con JSON en este formato:
       {
         "recommendations": [
           {
             "type": "hotel",
-            "name": "Hotel Name",
-            "description": "Description",
+            "name": "Nombre del Hotel",
+            "description": "Descripción",
             "rating": 4.5,
             "priceRange": "$$$",
-            "location": "Area",
-            "imageUrl": "https://example.com/image.jpg"
+            "location": "Área",
+            "imageUrl": "https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg"
           }
         ],
         "personalizationFactors": ["factor1", "factor2"]
@@ -192,7 +193,7 @@ export class OpenAIService {
         messages: [
           {
             role: "system",
-            content: "You are a professional travel recommendation agent specializing in personalized travel suggestions."
+            content: "Eres un agente profesional de recomendaciones de viaje especializado en sugerencias personalizadas de viaje en español."
           },
           {
             role: "user",
@@ -200,6 +201,7 @@ export class OpenAIService {
           }
         ],
         response_format: { type: "json_object" },
+        temperature: 0.7,
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
@@ -221,13 +223,16 @@ export class OpenAIService {
       const messages = [
         {
           role: "system" as const,
-          content: `You are a helpful customer service agent for Sisa AI, a travel assistance platform. 
-          Provide friendly, professional support. Help with booking issues, travel questions, 
-          and general assistance. Keep responses conversational and helpful.
+          content: `Eres un agente de atención al cliente útil para Sisa AI, una plataforma de asistencia de viajes. 
+          Proporciona soporte amigable y profesional. Ayuda con problemas de reservas, preguntas de viaje 
+          y asistencia general. Mantén las respuestas conversacionales y útiles en español.
           
-          User Context: ${context.userProfile ? JSON.stringify(context.userProfile) : 'No profile available'}`
+          Contexto del Usuario: ${context.userProfile ? JSON.stringify(context.userProfile) : 'Sin perfil disponible'}`
         },
-        ...context.conversationHistory.slice(-5), // Last 5 messages for context
+        ...context.conversationHistory.slice(-5).map(msg => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content
+        })),
         {
           role: "user" as const,
           content: query
@@ -238,9 +243,10 @@ export class OpenAIService {
         model: "gpt-4o",
         messages,
         temperature: 0.7,
+        max_tokens: 500,
       });
 
-      return response.choices[0].message.content || "I'm sorry, I couldn't process your request. Please try again.";
+      return response.choices[0].message.content || "Lo siento, no pude procesar tu solicitud. Por favor intenta de nuevo.";
     } catch (error) {
       throw new Error("Failed to handle customer service request: " + (error as Error).message);
     }

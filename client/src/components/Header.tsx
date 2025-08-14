@@ -42,7 +42,10 @@ export default function Header({ user }: HeaderProps) {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={() => {
+                    localStorage.removeItem('authToken');
+                    window.location.reload();
+                  }}
                 >
                   Cerrar Sesión
                 </Button>

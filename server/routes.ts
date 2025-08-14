@@ -1,23 +1,43 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { langGraphOrchestrator } from "./services/langGraph";
+import { authenticateToken, AuthRequest } from "./auth/authMiddleware";
+import { sisaOrchestrator } from "./services/langGraph/orchestrator";
 import { researchAgent } from "./services/agents/researchAgent";
 import { plannerAgent } from "./services/agents/plannerAgent";
 import { recommendationAgent } from "./services/agents/recommendationAgent";
 import { customerServiceAgent } from "./services/agents/customerServiceAgent";
+import authRoutes from "./routes/auth";
 import { insertMessageSchema, insertConversationSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Security middleware
+  app.use(helmet());
+  app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://your-domain.com'] 
+      : ['http://localhost:5000', 'http://localhost:3000'],
+    credentials: true,
+  }));
+
+  // Rate limiting
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+  });
+  app.use('/api', limiter);
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.use('/api/auth', authRoutes);
+
+  // Auth routes
+  app.get('/api/auth/user', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -27,9 +47,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chat and Conversation routes
-  app.post('/api/conversations', isAuthenticated, async (req: any, res) => {
+  app.post('/api/conversations', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const validatedData = insertConversationSchema.parse({
         ...req.body,
         userId,
@@ -43,9 +63,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/conversations', isAuthenticated, async (req: any, res) => {
+  app.get('/api/conversations', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const conversations = await storage.getUserConversations(userId);
       res.json(conversations);
     } catch (error) {
@@ -54,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+  app.get('/api/conversations/:id/messages', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const messages = await storage.getConversationMessages(id);
@@ -66,34 +86,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Multi-Agent Chat Processing
-  app.post('/api/chat/process', isAuthenticated, async (req: any, res) => {
+  app.post('/api/chat/process', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const { message, conversationId, agentType } = req.body;
       
-      if (!message || !conversationId || !agentType) {
+      if (!message || !conversationId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
       // Get user profile and conversation history
       const userProfile = await storage.getUser(userId);
-      const conversationHistory = await storage.getConversationMessages(conversationId);
       
-      // Build agent context
-      const agentContext = {
+      // Process message through Sisa AI orchestrator
+      const response = await sisaOrchestrator.processMessage(message, {
         userId,
         conversationId,
         userProfile,
-        conversationHistory: conversationHistory.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          agentType: msg.agentType || undefined,
-        })),
-        currentAgent: agentType,
-      };
-
-      // Process message through LangGraph orchestrator
-      const agentResponse = await langGraphOrchestrator.processMessage(agentContext, message);
+      });
       
       // Store user message
       await storage.createMessage({
@@ -106,23 +116,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createMessage({
         conversationId,
         role: 'assistant',
-        content: agentResponse.content,
+        content: response,
         agentType: agentType,
-        metadata: agentResponse.metadata,
       });
       
-      // Update conversation with new agent if suggested
-      if (agentResponse.nextAgent) {
-        await storage.updateConversation(conversationId, {
-          activeAgent: agentResponse.nextAgent,
-        });
-      }
-      
       res.json({
-        response: agentResponse.content,
-        nextAgent: agentResponse.nextAgent,
-        metadata: agentResponse.metadata,
-        shouldEnd: agentResponse.shouldEnd,
+        response,
       });
     } catch (error) {
       console.error("Error processing chat:", error);
@@ -131,9 +130,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Individual Agent Routes
-  app.post('/api/agents/research', isAuthenticated, async (req: any, res) => {
+  app.post('/api/agents/research', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const { query, budget, duration, travelStyle, interests, timeOfYear } = req.body;
       
       const researchQuery = {
@@ -159,9 +158,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/agents/planner', isAuthenticated, async (req: any, res) => {
+  app.post('/api/agents/planner', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const planningRequest = req.body;
       
       const context = {
@@ -178,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/agents/recommendations', isAuthenticated, async (req: any, res) => {
+  app.post('/api/agents/recommendations', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const recommendationRequest = req.body;
       
       const context = {
@@ -197,9 +196,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/agents/customer-service', isAuthenticated, async (req: any, res) => {
+  app.post('/api/agents/customer-service', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const { query, category, urgency, language } = req.body;
       
       const supportRequest = {
@@ -213,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         conversationId: req.body.conversationId,
         userProfile: await storage.getUser(userId),
-        conversationHistory: [], // Would be populated from conversation
+        conversationHistory: [],
       };
       
       const result = await customerServiceAgent.handleSupportRequest(supportRequest, context);
@@ -225,9 +224,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User Profile and Preferences
-  app.get('/api/user/profile', isAuthenticated, async (req: any, res) => {
+  app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const user = await storage.getUser(userId);
       const stats = await storage.getUserStats(userId);
       
@@ -241,9 +240,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/user/profile', isAuthenticated, async (req: any, res) => {
+  app.put('/api/user/profile', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const updates = req.body;
       
       const updatedUser = await storage.upsertUser({
@@ -259,9 +258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Travel History and Searches
-  app.get('/api/user/travel-history', isAuthenticated, async (req: any, res) => {
+  app.get('/api/travel-searches', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const limit = parseInt(req.query.limit as string) || 10;
       const searches = await storage.getUserTravelSearches(userId, limit);
       res.json(searches);
@@ -271,8 +270,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User stats
+  app.get('/api/user/stats', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const stats = await storage.getUserStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ message: "Failed to fetch user stats" });
+    }
+  });
+
   // Admin Routes
-  app.get('/api/admin/stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/system/stats', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const stats = await storage.getSystemStats();
       res.json(stats);
@@ -282,7 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/logs', isAuthenticated, async (req: any, res) => {
+  app.get('/api/system/logs', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
       const logs = await storage.getSystemLogs(limit);
@@ -302,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         database: 'connected',
         openai: 'connected',
         pinecone: 'connected',
-        langGraph: 'operational',
+        sisaAI: 'operational',
       },
     });
   });

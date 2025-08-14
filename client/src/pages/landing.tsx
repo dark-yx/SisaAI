@@ -1,7 +1,39 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import LoginForm from "@/components/auth/LoginForm";
+import RegisterForm from "@/components/auth/RegisterForm";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
+  const [showAuth, setShowAuth] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const { isAuthenticated } = useAuth();
+
+  const handleAuthSuccess = () => {
+    setShowAuth(false);
+    // The useAuth hook will automatically detect the authentication change
+    window.location.reload();
+  };
+
+  if (showAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 flex items-center justify-center p-4">
+        {isLogin ? (
+          <LoginForm 
+            onSuccess={handleAuthSuccess}
+            onToggleMode={() => setIsLogin(false)}
+          />
+        ) : (
+          <RegisterForm 
+            onSuccess={handleAuthSuccess}
+            onToggleMode={() => setIsLogin(true)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5">
       {/* Header */}
@@ -22,6 +54,7 @@ export default function Landing() {
                 </select>
               </div>
               <Button onClick={() => window.location.href = '/api/login'} className="bg-primary hover:bg-primary/90">
+              <Button onClick={() => setShowAuth(true)} className="bg-primary hover:bg-primary/90">
                 Iniciar Sesión
               </Button>
             </div>
@@ -43,7 +76,7 @@ export default function Landing() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                onClick={() => window.location.href = '/api/login'} 
+                onClick={() => setShowAuth(true)}
                 className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg"
               >
                 Comenzar Ahora
@@ -164,7 +197,7 @@ export default function Landing() {
             Únete a miles de viajeros que ya confían en Sisa AI para planificar sus viajes perfectos.
           </p>
           <Button 
-            onClick={() => window.location.href = '/api/login'} 
+            onClick={() => setShowAuth(true)}
             className="bg-white text-primary hover:bg-gray-100 px-8 py-4 text-lg font-semibold"
           >
             Comenzar Gratis

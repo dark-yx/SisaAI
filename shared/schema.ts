@@ -29,6 +29,7 @@ export const sessions = pgTable(
 // User storage table (Required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
+  password: varchar("password"), // For JWT auth
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -42,6 +43,7 @@ export const users = pgTable("users", {
   preferredDestinations: jsonb("preferred_destinations").$type<string[]>(),
   languagePreference: varchar("language_preference").default("es"),
   totalTrips: integer("total_trips").default(0),
+  suspended: boolean("suspended").default(false),
 });
 
 // Travel conversations

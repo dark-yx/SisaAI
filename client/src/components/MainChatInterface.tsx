@@ -38,10 +38,11 @@ export default function MainChatInterface({ activeAgent }: MainChatInterfaceProp
   // Create new conversation
   const createConversationMutation = useMutation({
     mutationFn: async (data: { title: string; activeAgent: string }) => {
-      return await apiRequest('/api/conversations', {
+      const response = await apiRequest('/api/conversations', {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      return await response.json();
     },
     onSuccess: (conversation: Conversation) => {
       setCurrentConversation(conversation);
@@ -70,10 +71,11 @@ export default function MainChatInterface({ activeAgent }: MainChatInterfaceProp
   // Send message to agent
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { message: string; conversationId: string; agentType: string }) => {
-      return await apiRequest('/api/chat/process', {
+      const response = await apiRequest('/api/chat/process', {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      return await response.json();
     },
     onSuccess: () => {
       setMessage("");
